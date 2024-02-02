@@ -4,44 +4,27 @@ on:
 
 jobs:
   build:
-    # Se especifica que el trabajo se ejecutará en un entorno Windows 2019
-    runs-on: windows-2019
+    runs-on: ubuntu-latest
 
-    # Se define una variable de entorno para el directorio de instalación de Dotnet
-    env:
-      DOTNET_INSTALL_DIR: '.\.dotnet'
-
-    # Sección de pasos que se ejecutarán en el trabajo
     steps:
-      # Paso para cachear la instalación de Dotnet para mejorar la velocidad de ejecución
-      - name: Cache dotnet
-        id: cache-dotnet
-        uses: actions/cache@v3
-        with:
-          # Se especifica la ruta a la carpeta que se desea cachear
-          path: ${{ env.DOTNET_INSTALL_DIR }}
-          # Clave única para identificar la caché, basada en el sistema operativo y la versión de Dotnet
-          key: ${{ runner.os }}-dotnet-7
-          # Claves para restaurar la caché en caso de fallo
-          restore-keys: ${{ runner.os }}-dotnet-7
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
-      # Paso para instalar Dotnet si la caché no fue golpeada (no se encontró en la caché)
-      - name: Install dotnet
-        # Este paso se ejecuta solo si el paso de caché no tuvo éxito (cache-hit no es 'true')
-        if: ${{ steps.cache-dotnet.outputs.cache-hit != 'true' }}
-        uses: actions/setup-dotnet@v3
-        with:
-          # Se especifica la versión de Dotnet a instalar
-          dotnet-version: 7.0.x
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 6.0.x
 
-      # Paso para verificar la versión predeterminada de Dotnet instalada
-      - name: Check default dotnet version
-        run: dotnet --version
+    - name: Restore NuGet packages
+      run: dotnet restore
 
-      # Paso para establecer la ruta de Dotnet instalada/caché en las variables de entorno de GitHub
-      - name: Set installed/cached dotnet path [${{ env.DOTNET_INSTALL_DIR }}]
-        run: echo "${{ env.DOTNET_INSTALL_DIR }}" | Out-File -FilePath $ENV:GITHUB_PATH -Encoding utf8 -Append
+    - name: Cache NuGet packages
+      uses: actions/cache@v2
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-dotnet-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-dotnet-
 
-      # Paso para verificar la versión de Dotnet instalada/caché
-      - name: Check installed/cached dotnet version
-        run: dotnet --version 
+    - name: Build and test
+      run: dotnet build --configuration Release --no-restore
